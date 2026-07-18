@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일간 운반비 보고서</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#1f3a5f; --navy-dark:#16293f; --blue:#2563eb;
+  --bg:#eef0f3; --card:#ffffff; --line:#d9dde3; --line-soft:#e8eaee;
+  --text:#1c2330; --muted:#6b7585;
+  --warn-bg:#fff7e0; --warn-line:#e6c860;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",system-ui,sans-serif;
+  background:var(--bg); color:var(--text); font-size:13px; line-height:1.5;
+}
+.page{max-width:1280px;margin:0 auto;padding:18px 20px 60px}
+.topstrip{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:4px 2px 10px}
+
+.uploader{
+  background:var(--card);border:1px dashed #b7bfc9;border-radius:8px;
+  padding:12px 18px;margin-bottom:12px;
+}
+.urow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.urow+.urow{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line-soft)}
+.nav-btn{
+  border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:4px;
+  font-size:11px;padding:5px 9px;cursor:pointer;font-family:inherit;font-weight:700;
+}
+.nav-btn:hover{background:#eef2f8;border-color:var(--navy)}
+.uploader .lbl{font-weight:700;color:var(--navy)}
+.uploader input[type=file]{font-size:12px}
+.btn{border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600}
+.btn.secondary{background:#fff;color:var(--navy)}
+.btn.editing{background:#d97706;border-color:#d97706;color:#fff}
+.status{font-size:12px;color:var(--muted)}
+.status.err{color:#c0392b;font-weight:600}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin-bottom:0}
+.tab{
+  border:1px solid var(--line);border-bottom:none;background:#dfe3e9;color:#5a6474;
+  border-radius:8px 8px 0 0;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:inherit;
+}
+.tab .tcnt{font-size:11px;font-weight:700;color:var(--blue);margin-left:5px}
+.tab.active{background:var(--card);color:var(--navy);position:relative;top:1px}
+
+.report{background:var(--card);border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:22px 26px 30px;box-shadow:0 1px 2px rgba(20,30,50,.05)}
+h1{font-size:19px;font-weight:800;letter-spacing:-.3px;padding-bottom:10px;border-bottom:2px solid var(--navy);margin-bottom:8px}
+h1 .datepart{font-weight:600;font-size:15px;color:var(--navy)}
+.meta{font-size:11.5px;color:var(--muted);margin-bottom:18px}
+.meta b{color:var(--text);font-weight:600}
+.meta span+span::before{content:"|";margin:0 8px;color:#c6ccd4}
+
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:22px}
+.card{background:#fafbfc;border:1px solid var(--line);border-radius:7px;padding:10px 14px;min-height:74px}
+.card .k{font-size:11px;color:var(--muted);margin-bottom:2px}
+.card .v{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.card .v small{font-size:12px;font-weight:700}
+.card .sub{font-size:11.5px;color:var(--blue);font-weight:700;margin-top:1px}
+.card.dim .v,.card.dim .sub{color:#9aa3b0}
+
+h2{font-size:14px;font-weight:800;margin:26px 0 10px;display:flex;align-items:center;gap:6px}
+h2 .num{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1.5px solid var(--text);border-radius:50%;font-size:11px;font-weight:800}
+.note{font-size:11px;color:var(--muted);margin:-4px 0 8px}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{background:var(--navy);color:#fff;font-weight:700;font-size:12px;padding:8px 10px;text-align:center;border:1px solid var(--navy-dark);white-space:nowrap}
+tbody td{padding:7px 10px;border:1px solid var(--line-soft);vertical-align:middle}
+.num-cell{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.num-cell b{color:var(--blue)}
+.cnt{color:var(--blue);font-weight:700;font-size:11.5px}
+.zero, .zero b, .zero .cnt{color:#a6aeba !important;font-weight:400}
+tr.branch td{background:#f2f4f7;font-weight:800}
+tr.branch td:first-child::before{content:"▣";margin-right:7px;color:var(--navy);font-size:11px}
+tr.staff td:first-child{padding-left:26px;color:#3b4454}
+tr.staff td:first-child::before{content:"ㄴ";margin-right:7px;color:#9aa3b0}
+tr.total td{background:var(--navy);color:#fff;font-weight:800;border-color:var(--navy-dark)}
+tr.total td b,tr.total .cnt{color:#ffd35c}
+td.grp{background:#e9edf3;font-weight:800}
+td.grp2{background:#f2f4f7;font-weight:700}
+tr.subtotal td{background:#fff6c9;font-weight:800;border-color:#ecd98a}
+tr.subtotal td b{color:var(--text)}
+tr.subtotal .cnt{color:#8a6d1a}
+
+.detail-wrap{overflow-x:auto}
+.detail{width:100%;table-layout:auto}
+.detail th{font-size:11px;padding:6px 5px}
+.detail td{font-size:11.5px;padding:4px 5px}
+.detail td:nth-child(1){width:32px}
+.detail .ecell[data-f="client"],.detail .ecell[data-f="dest"]{display:block;min-width:140px;max-width:230px}
+.detail .ecell[data-f="date"]{white-space:nowrap;font-size:11px}
+.detail .ecell[data-f="branch"]{min-width:30px}
+.detail .mini-btn.ok{display:block;margin:3px auto 0;padding:1px 6px;font-size:10px}
+.detail .c{text-align:center;white-space:nowrap}
+.detail td.wide{min-width:140px;max-width:240px}
+.detail tr.flagged td{background:var(--warn-bg)}
+.detail tr.flagged td:first-child{border-left:3px solid var(--warn-line)}
+.flag-note{margin-top:8px;font-size:11.5px;color:#8a6d1a;background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:5px;padding:7px 12px;display:inline-block}
+.nf-note{margin:-12px 0 20px;font-size:12px;color:#2d4a73;background:#eef4fb;border:1px solid #c7d9ee;border-radius:5px;padding:7px 12px}
+.nf-note b{color:var(--navy)}
+.dtbar select{font-size:11.5px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;font-family:inherit;max-width:280px}
+.filter-chip{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--blue);border-radius:4px;padding:2px 10px;vertical-align:middle;margin-left:4px}
+@media print{ .dtbar{display:none} }
+.dtype-chip{display:inline-block;font-size:10.5px;background:#eef2f8;color:var(--navy);border:1px solid #cdd8e6;border-radius:3px;padding:0 5px;white-space:nowrap}
+
+/* edit mode */
+.edit-badge{font-size:10.5px;font-weight:700;color:#fff;background:#d97706;border-radius:4px;padding:2px 8px;vertical-align:middle;margin-left:6px}
+.editbar{display:flex;align-items:center;gap:12px;margin-bottom:8px;background:#fdf6ea;border:1px solid #edd9a8;border-radius:6px;padding:7px 12px}
+.edit-hint{font-size:11.5px;color:#8a6d1a}
+.ecell{display:inline-block;min-width:28px;min-height:16px;border-bottom:1px dashed #b9c2cf;padding:0 2px;cursor:text;outline:none}
+.ecell:focus{background:#eef4ff;border-bottom:1.5px solid var(--blue)}
+.ecell.num{font-weight:700;color:var(--blue)}
+.einp{font-size:11.5px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;font-family:inherit;background:#fff}
+.einp:focus{outline:none;border-color:var(--blue);background:#eef4ff}
+.einp.w-veh{width:54px}
+.einp.w-typ{width:60px}
+.einp.w-per{width:88px}
+.mini-btn{border:1px solid var(--line);background:#fff;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-family:inherit}
+.mini-btn.del{color:#c0392b;border-color:#e2b4ae}
+.mini-btn.del:hover{background:#fbeae7}
+.mini-btn.ok{color:#8a6d1a;border-color:#e6c860;margin-left:4px;background:var(--warn-bg)}
+.mini-btn.ok:hover{background:#fdefc4}
+.mini-btn.add{color:var(--navy);border-color:var(--navy);font-weight:700;padding:4px 12px}
+.mini-btn.add:hover{background:#eef2f8}
+.mini-btn.edit-toggle{font-size:12px;padding:4px 14px;font-weight:700;color:var(--navy);border-color:var(--navy)}
+.mini-btn.edit-toggle:hover{background:#eef2f8}
+.mini-btn.edit-toggle.editing{background:#d97706;border-color:#d97706;color:#fff}
+
+.confirm{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.confirm .sign{color:var(--muted)}
+.confirm .sign b{color:var(--text);letter-spacing:8px;margin-left:6px}
+.pagefoot{display:flex;justify-content:space-between;font-size:10.5px;color:#a0a8b3;margin-top:10px;padding:0 4px}
+
+@media print{
+  body{background:#fff}
+  body.print-brief .sec-detail{display:none !important}
+  .sec1{break-after:page;page-break-after:always}
+  .sec1b{break-after:page;page-break-after:always}
+  .sec1 table,.sec1b table{max-width:100% !important}
+  body:not(.print-brief) .sec2{break-after:page;page-break-after:always}
+  .sec1b h2,.sec2 h2,.sec-detail h2{break-after:avoid}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  /* ── 2섹션 한 페이지 맞춤: 열간격·글자 압축 ── */
+  .sec2 h2{margin:6px 0 6px}
+  .sec2 .note{display:none}
+  .sec2 table{font-size:10.5px}
+  .sec2 thead th{padding:4px 6px;font-size:10px;line-height:1.25}
+  .sec2 thead th span{font-size:9px !important}
+  .sec2 tbody td{padding:2.5px 7px;line-height:1.3}
+  .sec2 .cnt{font-size:10px}
+  /* 행이 매우 많은 경우(50행 초과) 한 단계 더 축소 */
+  body.print-dense .sec2 table{font-size:9.5px}
+  body.print-dense .sec2 tbody td{padding:1.5px 6px;line-height:1.2}
+  body.print-dense .sec2 thead th{padding:3px 5px;font-size:9.5px}
+  body.print-dense .sec2 .cnt{font-size:9px}
+  .uploader,.tabs,.editbar,.edit-only,.edit-badge,.mini-btn{display:none !important}
+  .page{padding:0;max-width:none}
+  .report{border:none;box-shadow:none;padding:10px 4px;border-radius:0}
+  thead th,tr.branch td,tr.total td,.detail tr.flagged td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ecell{border-bottom:none}
+  .einp{border:none;background:transparent;width:auto}
+}
+@media (max-width:900px){ .cards{grid-template-columns:repeat(3,1fr)} }
+
+/* 로그인 */
+#loginOverlay{position:fixed;inset:0;background:rgba(22,30,45,.55);backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-box{background:#fff;border-radius:12px;padding:32px 30px 26px;width:340px;box-shadow:0 12px 40px rgba(0,0,0,.25);text-align:center}
+.login-title{font-size:18px;font-weight:800;color:var(--navy)}
+.login-sub{font-size:12px;color:var(--muted);margin:6px 0 20px}
+.login-box input{width:100%;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;margin-bottom:10px;font-family:inherit}
+.login-box input:focus{outline:none;border-color:var(--blue)}
+.login-btn{width:100%;padding:11px;font-size:14px;margin-top:4px}
+.login-msg{font-size:12px;color:#c0392b;margin-top:10px;min-height:16px;font-weight:600}
+#userBar .role-chip{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;border-radius:4px;padding:1px 7px;margin:0 6px}
+#userBar .role-admin{background:#d97706}
+#userBar .role-staff{background:#5a6474}
+#userBar a{color:var(--blue);cursor:pointer;text-decoration:underline;font-size:11px}
+.cloud-save{background:#0b8043;border-color:#0b8043}
+.cloud-save:disabled{background:#b8c2cc;border-color:#b8c2cc;cursor:not-allowed}
+#cloudStatus.ok{color:#0b8043;font-weight:600}
+#cloudStatus.err{color:#c0392b;font-weight:600}
+body.role-staff .cloud-save,
+body.role-staff #fileInput,
+body.role-staff #btnReset,
+body.role-staff .edit-toggle,
+body.role-staff #cloudRow .lbl+ #btnCloudSave{ }
+body.role-staff .staff-hide{display:none !important}
+</style>
+</head>
+<body>
+<!-- 로그인 오버레이 -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-title">대성하우징 운반비 보고서</div>
+    <div class="login-sub">사내 공용 계정으로 로그인하세요</div>
+    <input type="text" id="loginId" placeholder="아이디" autocomplete="username">
+    <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password">
+    <button class="btn login-btn" id="loginBtn">로그인</button>
+    <div class="login-msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="topstrip">
+    <span id="printDate"></span>
+    <span id="userBar"></span>
+  </div>
+
+  <div class="uploader">
+    <div class="urow">
+      <span class="lbl">보고서 기간</span>
+      <select id="periodMode" style="font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;font-family:inherit">
+        <option value="day">일간</option>
+        <option value="week">주간</option>
+        <option value="month">월간</option>
+        <option value="range">기간</option>
+      </select>
+      <button class="nav-btn" id="navPrev" title="이전 기간">◀</button>
+      <input type="date" id="dateA" style="font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:4px">
+      <button class="nav-btn" id="navNext" title="다음 기간">▶</button>
+      <span id="rangeSep" style="display:none;color:var(--muted)">~</span>
+      <input type="date" id="dateB" style="display:none;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:4px">
+      <span id="weekInfo" style="display:none;font-size:11.5px;color:var(--blue);font-weight:700"></span>
+      <span class="lbl">원데이터 업로드</span>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <button class="btn secondary" id="btnReset">전체 지우기</button>
+      <button class="btn" id="btnDownload">엑셀 다운로드 (2개 탭)</button>
+    </div>
+    <div class="urow" id="cloudRow">
+      <span class="lbl">구글시트</span>
+      <button class="btn secondary" id="btnCloudLoad">이 기간 불러오기</button>
+      <button class="btn cloud-save" id="btnCloudSave">이 기간 저장</button>
+      <span class="status" id="cloudStatus"></span>
+    </div>
+    <div class="urow">
+      <button class="btn secondary" id="btnPrintBrief" title="종합·일자별·지점별·개인별 집계까지 출력 (상세내역 제외)">인쇄/PDF (집계만)</button>
+      <button class="btn secondary" id="btnPrintFull" title="상세내역까지 전부 출력">인쇄/PDF (전체)</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="report" id="report"></div>
+
+  <datalist id="vehicleList"></datalist>
+  <datalist id="typeList"></datalist>
+  <datalist id="staffList"></datalist>
+  <datalist id="repList"></datalist>
+
+  <div class="pagefoot"><span>about:blank</span><span>1/1</span></div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+ *  구글시트 연동 설정 — API_URL 에 Apps Script 웹앱 배포 URL 붙여넣기
+ * ══════════════════════════════════════════════════════════════ */
+const API_URL = "https://script.google.com/macros/s/AKfycbybwkcJ2WYsDCqbp9OtH2BSxHSLX-hxWhah0d8xcOoYDVqIrrYQ1VAO7itB-OM3OPMh/exec";
+let SESSION = { id:null, role:null, token:null };
+async function apiCall(payload){
+  if (!API_URL) throw new Error("구글시트 주소(API_URL)가 설정되지 않았습니다.");
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers:{ "Content-Type":"text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "요청이 실패했습니다.");
+  return data;
+}
+
+/* ═══════ 기본 내장 데이터 (2026-07-15 원데이터 변환본) ═══════ */
+const DEFAULT_RECORDS = [];
+const DEFAULT_TITLE_DATE = new Date().toISOString().slice(0,10);
+
+/* ═══════ 콤보박스 목록 (지난 6개월 데이터 기준) ═══════ */
+const VOCAB = {"staff": ["김한솔(창동)", "신동수(포천)", "이은아(창동)", "한강수(창동)", "최종혁(포천)", "김진형(포천)", "김희규(창동)", "김영미(창동)", "방윤경(물류)", "우종규(포천)", "박기완(포천)", "홍순호(포천)", "고충현(포천)", "서동숙(특판)", "김건오(포천)", "이수진(총무)", "박서하(특판)", "이은숙(총무)", "나선후(남양주)", "김이나(포천)", "김한결(창동)", "박형준(창동철물)", "신태영(창동)", "민성호(창동)", "김재열(물류)"], "reps": ["한강수(창동)", "신동수(포천)", "김희규(창동)", "최종혁(포천)", "신태영(창동)", "우종규(포천)", "김진형(포천)", "이은아(창동)", "홍순호(포천)", "박서하(특판)", "서동숙(특판)", "김한솔(창동)", "박기완(포천)", "김영미(창동)", "김이나(포천)", "고충현(포천)", "온라인(특판)", "나선후(금곡)", "김건오(포천)", "김한결(창동)", "민성호(창동)", "특판영업부", "김진호(금곡)", "간접부서(물류센터)", "포천영업부"], "vehicles": ["오토", "다마스", "라보", "1톤", "1.4톤", "2.5톤", "3.5톤", "4톤", "5톤", "5톤축", "25톤"], "types": ["당사", "대불", "당사+대불", "착불"]};
+
+const GROUPS = {
+  dm:  {label:"동명물류", title:"동명물류 운반비 보고서", target:'배송유형 "동명물류" 건'},
+  etc: {label:"기타 배송", title:"기타 배송유형 운반비 보고서", target:'동명물류 외 배송유형 건 (용달착불·화물·택배 등)'},
+  all: {label:"종합", title:"종합 운반비 보고서", target:'전체 배송유형 (동명물류 + 기타 배송)'},
+  flt: {label:"필터", title:"배송유형별 운반비 보고서", target:'선택한 배송유형 건'},
+};
+const BRANCH_ORDER = ["창동","포천","남양주","특판","물류","금곡"];
+const WEEKDAYS = ["일","월","화","수","목","금","토"];
+const fmt = n => (n||0).toLocaleString("ko-KR");
+
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+let records = DEFAULT_RECORDS.map(r=>({...r}));
+let nonFreight = [];   // 배송유형 없음/방문수령/반입 등 운반비 미발생 전표의 {date, sales}
+let periodMode = "day";
+let dateA = isoOf(new Date());
+let dateB = dateA;
+let editMode = true;
+let currentTab = "dm";
+let dtypeFilter = "";        // 기타 배송 탭: 배송유형 필터 (빈값=전체)
+
+function periodRange(){
+  if (periodMode==="day") return [dateA, dateA];
+  if (periodMode==="week"){
+    const d = new Date(dateA+"T00:00:00");
+    const dow = (d.getDay()+6)%7;               // 월요일 시작
+    const s = new Date(d); s.setDate(d.getDate()-dow);
+    const e = new Date(s); e.setDate(s.getDate()+6);
+    return [isoOf(s), isoOf(e)];
+  }
+  if (periodMode==="month"){
+    const d = new Date(dateA+"T00:00:00");
+    const s = new Date(d.getFullYear(), d.getMonth(), 1);
+    const e = new Date(d.getFullYear(), d.getMonth()+1, 0);   // 말일
+    return [isoOf(s), isoOf(e)];
+  }
+  return dateA<=dateB ? [dateA,dateB] : [dateB,dateA];
+}
+function inPeriod(r){
+  if (!r.date) return true;                     // 날짜 미입력 행은 항상 표시
+  const [s,e] = periodRange();
+  return r.date>=s && r.date<=e;
+}
+function periodLabel(){
+  const [s,e] = periodRange();
+  const L = iso => { const d=new Date(iso+"T00:00:00");
+    return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`; };
+  return s===e ? L(s) : L(s)+" ~ "+L(e);
+}
+function periodTag(){
+  const [s,e] = periodRange();
+  return s===e ? s : s+"~"+e;
+}
+
+/* ═══════ 원데이터 → 변환 ═══════ */
+const EXCLUDE_RE = /방문수령|반입|전표수정|출고대기|보관품|이고/;
+function toNum(v){ const n = parseFloat(String(v??"").replace(/[,\s원]/g,"")); return isNaN(n)?0:n; }
+function extractBranch(w){ const m=/\(([^)]+)\)/.exec(String(w||"")); return m?m[1]:""; }
+// 영업담당: 이익부서 열이 있으면 그것, 없으면 작성자에서 이름(괄호 앞)만 추출
+function nameOnly(w){ return String(w||"").replace(/\s*\([^)]*\)\s*$/, "").trim(); }
+function salesRepOf(r){
+  const ib = String(r["이익부서"]||"").trim();
+  if (ib) return ib;                         // 기존 양식: 이익부서 = 영업담당
+  const w = String(r["작성자"]||"").trim();
+  return w ? nameOnly(w) : "";               // 신양식: 작성자 이름을 영업담당으로
+}
+function vehicleOf(note){ const m=String(note||"").match(/(\d+(?:\.\d+)?톤(?:축)?|다마스|라보|오토)/); return m?m[1]:""; }
+function classifyType(note, transportType){
+  const n=String(note||""), t=String(transportType||"");
+  if (t.includes("착불") || (n.includes("착불") && !n.includes("당사") && !n.includes("대불")))
+    return {type:"착불", flag:false};
+  const dang = t.includes("당사")||n.includes("당사");
+  const dae  = t.includes("대불")||n.includes("대불");
+  if (dang && dae) return {type:"당사", flag:true};
+  if (dae) return {type:"대불", flag:false};
+  if (dang) return {type:"당사", flag:false};
+  return {type:"당사", flag:true};
+}
+function convertRaw(rows){
+  const out=[]; const nf=[]; const dates=new Set();
+  rows.forEach(r=>{
+    const dt = String(r["배송유형"]||"").trim();
+    const d = String(r["발행일"]||"").slice(0,10);
+    if (d) dates.add(d);
+    if (!dt || EXCLUDE_RE.test(dt)){
+      nf.push({date:d, sales:toNum(r["합계"]), branch: extractBranch(r["작성자"])});   // 비운임 매출 (방문수령·반입 등)
+      return;
+    }
+    const cls = classifyType(r["비고"], r["운반유형"]);
+    out.push({
+      no:0, date:d, client:String(r["거래처명"]||""),
+      dest: r["납품(현장) 주소"]?String(r["납품(현장) 주소"]):"",
+      fee: toNum(r["운반비"]), type:cls.type,
+      branch: extractBranch(r["작성자"]), staff:String(r["작성자"]||""),
+      driver: r["기사명"]?String(r["기사명"]):"", vehicle: vehicleOf(r["비고"]),
+      sales: toNum(r["합계"]), salesRep: salesRepOf(r),
+      dtype: dt, group: dt.includes("동명물류")?"dm":"etc", flag: cls.flag,
+    });
+  });
+  renumberAll(out);
+  nf.forEach(x=>{ if(x.date) dates.add(x.date); });
+  const dArr=[...dates].filter(Boolean).sort();
+  return {records:out, nonFreight:nf,
+    date: dArr.length?dArr[dArr.length-1]:"",
+    dateMin: dArr.length?dArr[0]:"",
+    dateMax: dArr.length?dArr[dArr.length-1]:"" };
+}
+function renumberAll(recs){
+  let a=0,b=0;
+  recs.forEach(r=>{ r.no = (r.group==="dm") ? ++a : ++b; });
+}
+function tabRecords(){
+  if (currentTab==="all") return records.filter(inPeriod);
+  if (currentTab==="flt"){
+    let rs = records.filter(inPeriod);
+    if (dtypeFilter) rs = rs.filter(r=>r.dtype===dtypeFilter);
+    return rs;
+  }
+  return records.filter(r=>r.group===currentTab && inPeriod(r));
+}
+
+/* ═══════ 집계 ═══════ */
+function aggregate(recs){
+  const total={cnt:recs.length,fee:0,dangsaCnt:0,dangsaFee:0,daebulCnt:0,daebulFee:0,chakbulCnt:0,chakbulFee:0,sales:0,flagCnt:0};
+  const byBranch={};
+  recs.forEach(r=>{
+    total.fee+=r.fee; total.sales+=r.sales;
+    if (r.type==="대불"){ total.daebulCnt++; total.daebulFee+=r.fee; }
+    else if (r.type==="착불"){ total.chakbulCnt++; total.chakbulFee+=r.fee; }
+    else { total.dangsaCnt++; total.dangsaFee+=r.fee; }
+    if (r.flag) total.flagCnt++;
+    const b=r.branch||"기타";
+    if(!byBranch[b]) byBranch[b]={cnt:0,dangsa:0,daebul:0,chakbul:0,fee:0,sales:0,staff:{}};
+    const B=byBranch[b];
+    B.cnt++; B.fee+=r.fee; B.sales+=r.sales;
+    if (r.type==="대불") B.daebul+=r.fee; else if (r.type==="착불") B.chakbul+=r.fee; else B.dangsa+=r.fee;
+    const s=r.staff||"미지정";
+    if(!B.staff[s]) B.staff[s]={cnt:0,dangsa:0,daebul:0,chakbul:0,fee:0,sales:0};
+    const S=B.staff[s];
+    S.cnt++; S.fee+=r.fee; S.sales+=r.sales;
+    if (r.type==="대불") S.daebul+=r.fee; else if (r.type==="착불") S.chakbul+=r.fee; else S.dangsa+=r.fee;
+  });
+  return {total,byBranch};
+}
+
+/* ═══════ 렌더링 ═══════ */
+function moneyCell(v,cnt,bold){
+  const zero=!v&&!cnt?" zero":"";
+  return `<td class="num-cell${zero}">${bold?`<b>${fmt(v)}</b>`:fmt(v)} <span class="cnt">(${cnt??0})</span></td>`;
+}
+function moneyOnly(v){ return `<td class="num-cell${!v?" zero":""}"><b>${fmt(v)}</b></td>`; }
+function comboCell(i,f,val,listId,wcls,ph){
+  return `<input class="einp ${wcls}" list="${listId}" data-i="${i}" data-f="${f}" value="${String(val).replace(/"/g,'&quot;')}" placeholder="${ph}">`;
+}
+
+function renderTabs(){
+  const dmN = records.filter(r=>r.group==="dm" && inPeriod(r)).length;
+  const etN = records.filter(r=>r.group==="etc" && inPeriod(r)).length;
+  document.getElementById("tabs").innerHTML = `
+    <button class="tab ${currentTab==="dm"?"active":""}" data-tab="dm">동명물류<span class="tcnt">${dmN}건</span></button>
+    <button class="tab ${currentTab==="etc"?"active":""}" data-tab="etc">기타 배송<span class="tcnt">${etN}건</span></button>
+    <button class="tab ${currentTab==="all"?"active":""}" data-tab="all">종합<span class="tcnt">${dmN+etN}건</span></button>
+    <button class="tab ${currentTab==="flt"?"active":""}" data-tab="flt">필터<span class="tcnt">${dtypeFilter?records.filter(r=>inPeriod(r)&&r.dtype===dtypeFilter).length+"건":"선택"}</span></button>`;
+}
+
+function render(){
+  renderTabs();
+  const recs = tabRecords();
+  const {total, byBranch} = aggregate(recs);
+  const nfRows = nonFreight.filter(inPeriod);
+  const nfSales = nfRows.reduce((a,r)=>a+r.sales,0);
+  const nfCnt = nfRows.length;
+  const G = GROUPS[currentTab];
+  const isEtc = currentTab!=="dm";        // etc·종합 탭에서 배송유형 열 표시
+  const dateLabel = periodLabel();
+
+  const cards = `
+  <div class="cards">
+    <div class="card"><div class="k">총 운반건수</div><div class="v">${total.cnt}<small>건</small></div><div class="sub">${fmt(total.fee)}원</div></div>
+    <div class="card ${total.dangsaCnt?"":"dim"}"><div class="k">당사 운임</div><div class="v">${total.dangsaCnt}<small>건</small></div><div class="sub">${fmt(total.dangsaFee)}원</div></div>
+    <div class="card ${total.daebulCnt?"":"dim"}"><div class="k">대불 운임</div><div class="v">${total.daebulCnt}<small>건</small></div><div class="sub">${fmt(total.daebulFee)}원</div></div>
+    <div class="card ${total.chakbulCnt?"":"dim"}"><div class="k">착불 운임</div><div class="v">${total.chakbulCnt}<small>건</small></div><div class="sub">${fmt(total.chakbulFee)}원</div></div>
+    <div class="card"><div class="k">부가세 포함 합계</div><div class="v"><small>&#8361;</small>${fmt(Math.round(total.fee*1.1))}</div><div class="sub">운반비 × 1.1</div></div>
+    <div class="card"><div class="k">${currentTab==="all"?"전체 전표 매출":"관련 매출액"}</div><div class="v"><small>&#8361;</small>${fmt(currentTab==="all"?total.sales+nfSales:total.sales)}</div><div class="sub">${currentTab==="all"?`운반 ${total.cnt}건 + 비운임 ${nfCnt}건`:`${total.cnt}건 전표합계`}</div></div>
+  </div>`;
+
+  /* ── section 1 : 지점별 합계 (구분×지점) ── */
+  const fmt0 = v => v ? fmt(v) : "-";
+  const TPL_DAEBUL = ["창동","포천","특판","남양주"];
+  const TPL_DANGSA = ["창동","포천","특판","남양주","물류"];
+  function typeBranchAgg(type){
+    const m = {};
+    recs.filter(r=>r.type===type).forEach(r=>{
+      const b = r.branch||"기타";
+      if(!m[b]) m[b] = {fee:0,cnt:0,sales:0};
+      m[b].fee += r.fee; m[b].cnt++; m[b].sales += r.sales;
+    });
+    return m;
+  }
+  const typeGroups = ["대불","당사"];
+  if (recs.some(r=>r.type!=="대불" && r.type!=="당사")) typeGroups.push("착불");
+  let rowsA = "";
+  typeGroups.forEach(tg=>{
+    const m = (tg==="착불")
+      ? (()=>{ const mm={}; recs.filter(r=>r.type!=="대불"&&r.type!=="당사").forEach(r=>{const b=r.branch||"기타"; if(!mm[b])mm[b]={fee:0,cnt:0,sales:0}; mm[b].fee+=r.fee; mm[b].cnt++; mm[b].sales+=r.sales;}); return mm; })()
+      : typeBranchAgg(tg);
+    const tpl = tg==="당사" ? TPL_DANGSA : (tg==="대불" ? TPL_DAEBUL : []);
+    const list = tpl.concat(Object.keys(m).filter(b=>!tpl.includes(b)).sort((a,b)=>{
+      const ia=BRANCH_ORDER.indexOf(a), ib=BRANCH_ORDER.indexOf(b);
+      return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,"ko");
+    }));
+    let subFee=0, subCnt=0, subSales=0;
+    list.forEach(b=>{
+      const e = m[b]||{fee:0,cnt:0,sales:0};
+      if (tg==="착불" && !e.cnt) return;
+      subFee+=e.fee; subCnt+=e.cnt; subSales+=(e.sales||0);
+      rowsA += `<tr>
+        <td class="c grp">${tg}</td><td class="c grp2">${b}</td>
+        <td class="num-cell${e.fee?"":" zero"}">${fmt0(e.fee)} <span class="cnt">(${e.cnt})</span></td>
+        <td class="num-cell${e.fee?"":" zero"}">${fmt0(Math.round(e.fee*1.1))}</td>
+        <td class="num-cell${e.sales?"":" zero"}">${fmt0(e.sales)}</td>
+      </tr>`;
+    });
+    rowsA += `<tr class="subtotal">
+      <td colspan="2" style="text-align:center">${tg} 소계</td>
+      <td class="num-cell${subFee?"":" zero"}"><b>${fmt0(subFee)}</b> <span class="cnt">(${subCnt})</span></td>
+      <td class="num-cell${subFee?"":" zero"}"><b>${fmt0(Math.round(subFee*1.1))}</b></td>
+      <td class="num-cell${subSales?"":" zero"}"><b>${fmt0(subSales)}</b></td>
+    </tr>`;
+  });
+  rowsA += `<tr class="total">
+    <td colspan="2" style="text-align:center">운반 합&nbsp;&nbsp;계</td>
+    <td class="num-cell"><b>${fmt(total.fee)}</b> <span class="cnt">(${total.cnt})</span></td>
+    <td class="num-cell"><b>${fmt(Math.round(total.fee*1.1))}</b></td>
+    <td class="num-cell"><b>${fmt(total.sales)}</b></td>
+  </tr>`;
+  /* 비운임 매출 그룹 (기타 배송·종합 탭) — 금액은 매출액 기준, 부가세 열 해당 없음 */
+  if ((currentTab==="etc"||currentTab==="all") && nfCnt){
+    const nfB = {};
+    nfRows.forEach(r=>{
+      const b = r.branch || "기타";
+      if(!nfB[b]) nfB[b]={sales:0,cnt:0};
+      nfB[b].sales += r.sales; nfB[b].cnt++;
+    });
+    const bl = Object.keys(nfB).sort((a,b)=>{
+      const ia=BRANCH_ORDER.indexOf(a), ib=BRANCH_ORDER.indexOf(b);
+      return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,"ko");
+    });
+    bl.forEach(b=>{
+      const e = nfB[b];
+      rowsA += `<tr><td class="c grp">비운임</td><td class="c grp2">${b}</td>
+        <td class="num-cell zero">- <span class="cnt">(${e.cnt})</span></td>
+        <td class="num-cell zero">-</td>
+        <td class="num-cell${e.sales?"":" zero"}">${e.sales?fmt(e.sales):"-"}</td></tr>`;
+    });
+    rowsA += `<tr class="subtotal"><td colspan="2" style="text-align:center">비운임 소계</td>
+      <td class="num-cell zero">- <span class="cnt">(${nfCnt})</span></td>
+      <td class="num-cell zero">-</td>
+      <td class="num-cell"><b>${fmt(nfSales)}</b></td></tr>`;
+    // 전체 매출 합계 행 (운반 매출 + 비운임 매출)
+    rowsA += `<tr class="total"><td colspan="2" style="text-align:center">전체 매출 합&nbsp;&nbsp;계</td>
+      <td class="num-cell"><b>${fmt(total.fee)}</b> <span class="cnt">(${total.cnt+nfCnt})</span></td>
+      <td class="num-cell"><b>${fmt(Math.round(total.fee*1.1))}</b></td>
+      <td class="num-cell"><b>${fmt(total.sales+nfSales)}</b></td></tr>`;
+  }
+
+  /* 종합 탭: 그룹별 합계 요약 */
+  let groupSummary = "";
+  if (currentTab==="all"){
+    const gAgg = g => {
+      const rs = records.filter(r=>r.group===g && inPeriod(r));
+      return {fee: rs.reduce((a,r)=>a+r.fee,0), cnt: rs.length, sales: rs.reduce((a,r)=>a+r.sales,0)};
+    };
+    const dmA=gAgg("dm"), etA=gAgg("etc");
+    const allSales = dmA.sales+etA.sales+nfSales;
+    const fmt0g = v => v?fmt(v):"-";
+    groupSummary = `
+    <h2><span class="num">§</span> 배송유형 그룹 합계</h2>
+    <p class="note">※ 비운임 매출 = 방문수령·반입 등 운반비 미발생 전표 · 매출액 합계 = 기간 내 전체 전표 매출</p>
+    <table style="max-width:760px;margin-bottom:4px">
+      <thead><tr><th style="width:20%">구분</th><th>운반비 <span style="font-weight:400;font-size:10.5px">(건수)</span></th><th>부가세 포함</th><th>매출액</th></tr></thead>
+      <tbody>
+        <tr><td class="c grp2">동명물류</td><td class="num-cell${dmA.fee?"":" zero"}">${fmt0g(dmA.fee)} <span class="cnt">(${dmA.cnt})</span></td><td class="num-cell${dmA.fee?"":" zero"}">${fmt0g(Math.round(dmA.fee*1.1))}</td><td class="num-cell${dmA.sales?"":" zero"}">${fmt0g(dmA.sales)}</td></tr>
+        <tr><td class="c grp2">기타 배송</td><td class="num-cell${etA.fee?"":" zero"}">${fmt0g(etA.fee)} <span class="cnt">(${etA.cnt})</span></td><td class="num-cell${etA.fee?"":" zero"}">${fmt0g(Math.round(etA.fee*1.1))}</td><td class="num-cell${etA.sales?"":" zero"}">${fmt0g(etA.sales)}</td></tr>
+        <tr><td class="c grp2">비운임 매출</td><td class="num-cell zero">- <span class="cnt">(${nfCnt})</span></td><td class="num-cell zero">-</td><td class="num-cell${nfSales?"":" zero"}">${fmt0g(nfSales)}</td></tr>
+        <tr class="total"><td style="text-align:center">합&nbsp;&nbsp;계</td><td class="num-cell"><b>${fmt(dmA.fee+etA.fee)}</b> <span class="cnt">(${dmA.cnt+etA.cnt})</span></td><td class="num-cell"><b>${fmt(Math.round((dmA.fee+etA.fee)*1.1))}</b></td><td class="num-cell"><b>${fmt(allSales)}</b></td></tr>
+      </tbody>
+    </table>`;
+  }
+
+  /* 일자별 합계 표 (여러 날짜 선택 시) */
+  let dailyTable = "";
+  {
+    const dm = {};
+    recs.forEach(r=>{
+      const d = r.date || "(미상)";
+      if(!dm[d]) dm[d]={fee:0,cnt:0,sales:0,nfSales:0,nfCnt:0};
+      dm[d].fee += r.fee; dm[d].cnt++; dm[d].sales += r.sales;
+    });
+    const showNf = (currentTab==="etc"||currentTab==="all");
+    if (showNf){
+      nfRows.forEach(r=>{
+        const d = r.date || "(미상)";
+        if(!dm[d]) dm[d]={fee:0,cnt:0,sales:0,nfSales:0,nfCnt:0};
+        dm[d].nfSales += r.sales; dm[d].nfCnt++;
+      });
+    }
+    const days = Object.keys(dm).sort();
+    if (days.length >= 2){
+      const wd = ["일","월","화","수","목","금","토"];
+      const lbl = d => {
+        const dt = new Date(d+"T00:00:00");
+        return isNaN(dt) ? d : `${d.slice(5).replace("-","/")} (${wd[dt.getDay()]})`;
+      };
+      let dr = "";
+      let tF=0,tC=0,tS=0,tNfS=0,tNfC=0;
+      days.forEach(d=>{
+        const e = dm[d];
+        tF+=e.fee; tC+=e.cnt; tS+=e.sales; tNfS+=e.nfSales; tNfC+=e.nfCnt;
+        dr += `<tr>
+          <td class="c grp2">${lbl(d)}</td>
+          <td class="num-cell${e.fee?"":" zero"}">${e.fee?fmt(e.fee):"-"} <span class="cnt">(${e.cnt})</span></td>
+          <td class="num-cell${e.fee?"":" zero"}">${e.fee?fmt(Math.round(e.fee*1.1)):"-"}</td>
+          ${showNf?`<td class="num-cell${e.nfSales?"":" zero"}">${e.nfSales?fmt(e.nfSales):"-"} <span class="cnt">(${e.nfCnt})</span></td>`:""}
+          <td class="num-cell${(e.sales+e.nfSales)?"":" zero"}"><b>${fmt(e.sales+e.nfSales)}</b></td>
+        </tr>`;
+      });
+      dr += `<tr class="total">
+        <td style="text-align:center">합&nbsp;&nbsp;계</td>
+        <td class="num-cell"><b>${fmt(tF)}</b> <span class="cnt">(${tC})</span></td>
+        <td class="num-cell"><b>${fmt(Math.round(tF*1.1))}</b></td>
+        ${showNf?`<td class="num-cell"><b>${fmt(tNfS)}</b> <span class="cnt">(${tNfC})</span></td>`:""}
+        <td class="num-cell"><b>${fmt(tS+tNfS)}</b></td>
+      </tr>`;
+      dailyTable = `
+      <h2 style="margin-top:20px"><span class="num">§</span> 일자별 합계</h2>
+      <p class="note">※ 선택 기간 내 날짜별 집계 · 매출액 = ${showNf?"운반 매출 + 비운임 매출":"운반 건 매출"}</p>
+      <table style="max-width:${showNf?"720":"560"}px">
+        <thead><tr>
+          <th style="width:20%">일자</th>
+          <th>운반비 <span style="font-weight:400;font-size:10.5px">(건수)</span></th>
+          <th>부가세 포함</th>
+          ${showNf?'<th>비운임 매출 <span style="font-weight:400;font-size:10.5px">(건수)</span></th>':""}
+          <th>매출액</th>
+        </tr></thead>
+        <tbody>${dr}</tbody>
+      </table>`;
+    }
+  }
+
+  const sec1 = `
+  <div class="sec1">
+  ${groupSummary}
+  ${dailyTable}
+  </div>
+  <div class="sec1b">
+  <h2><span class="num">§</span> 지점별 합계</h2>
+  <p class="note">※ 구분 × 지점 · 운반비 · 부가세 포함(×1.1) · 매출액(전표 합계) · "-"는 해당 없음 · 비운임 = 방문수령·반입 등 운반비 미발생 전표</p>
+  <table style="max-width:820px">
+    <thead><tr>
+      <th style="width:12%">구분</th>
+      <th style="width:16%">지점</th>
+      <th>운반비 <span style="font-weight:400;font-size:10.5px">(건수)</span></th>
+      <th>부가세 포함</th>
+      <th>매출액</th>
+    </tr></thead>
+    <tbody>${rowsA}</tbody>
+  </table>
+  </div>`;
+
+  /* ── section 2 : 지점별·개인별 종합 ── */
+  const branches = Object.keys(byBranch).sort((a,b)=>{
+    const ia=BRANCH_ORDER.indexOf(a), ib=BRANCH_ORDER.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,"ko");
+  });
+  const cRec=(b,t)=>recs.filter(r=>(r.branch||"기타")===b&&r.type===t).length;
+  const cStf=(b,s,t)=>recs.filter(r=>(r.branch||"기타")===b&&(r.staff||"미지정")===s&&r.type===t).length;
+  let rows1="";
+  branches.forEach(b=>{
+    const B=byBranch[b];
+    rows1+=`<tr class="branch"><td>${b}점</td>${moneyCell(B.fee,B.cnt,true)}${moneyCell(B.dangsa,cRec(b,"당사"),true)}${moneyCell(B.daebul,cRec(b,"대불"),true)}${moneyCell(B.chakbul,cRec(b,"착불"),true)}${moneyOnly(B.sales)}</tr>`;
+    Object.keys(B.staff).sort((x,y)=>B.staff[y].fee-B.staff[x].fee).forEach(s=>{
+      const S=B.staff[s];
+      rows1+=`<tr class="staff"><td>${s}</td>${moneyCell(S.fee,S.cnt)}${moneyCell(S.dangsa,cStf(b,s,"당사"))}${moneyCell(S.daebul,cStf(b,s,"대불"))}${moneyCell(S.chakbul,cStf(b,s,"착불"))}${moneyOnly(S.sales)}</tr>`;
+    });
+    rows1+=`<tr class="subtotal"><td style="text-align:center">${b} 소계</td>${moneyCell(B.fee,B.cnt,true)}${moneyCell(B.dangsa,cRec(b,"당사"),true)}${moneyCell(B.daebul,cRec(b,"대불"),true)}${moneyCell(B.chakbul,cRec(b,"착불"),true)}${moneyOnly(B.sales)}</tr>`;
+  });
+  rows1+=`<tr class="total"><td>전체 합계</td>${moneyCell(total.fee,total.cnt,true)}${moneyCell(total.dangsaFee,total.dangsaCnt,true)}${moneyCell(total.daebulFee,total.daebulCnt,true)}${moneyCell(total.chakbulFee,total.chakbulCnt,true)}${moneyOnly(total.sales)}</tr>`;
+
+  const sec1b = `
+  <div class="sec2">
+  <h2><span class="num">§</span> 지점별 · 개인별 종합</h2>
+  <p class="note">※ 각 칸: 운반비(건수) · 비용담당(작성자) 기준 집계</p>
+  <table>
+    <thead><tr>
+      <th style="width:19%">지점 / 담당자</th>
+      <th>운반비 합계<br><span style="font-weight:400;font-size:10.5px">금액 (건수)</span></th>
+      <th>당사 운임<br><span style="font-weight:400;font-size:10.5px">금액 (건수)</span></th>
+      <th>대불 운임<br><span style="font-weight:400;font-size:10.5px">금액 (건수)</span></th>
+      <th>착불 운임<br><span style="font-weight:400;font-size:10.5px">금액 (건수)</span></th>
+      <th>관련 매출액</th>
+    </tr></thead>
+    <tbody>${rows1}</tbody>
+  </table>
+  </div>`;
+
+  /* ── section 3 : 상세 내역 (날짜순 정렬) ── */
+  const cols = 12 + (isEtc?1:0) + (editMode?1:0);
+  const _sortByDate = arr => arr
+    .map((r,idx)=>({r,idx}))
+    .sort((a,b)=>{
+      const da=a.r.date||"", db=b.r.date||"";
+      if (da!==db) return da<db?-1:1;
+      return a.idx-b.idx;
+    })
+    .map(x=>x.r);
+  const recsFee  = _sortByDate(recs.filter(r=>r.fee>0));   // 운반비 발생
+  const recsZero = _sortByDate(recs.filter(r=>!(r.fee>0))); // 운반비 0원
+  const feeTotalSales = recsFee.reduce((a,r)=>a+r.sales,0);
+  const feeTotalFee   = recsFee.reduce((a,r)=>a+r.fee,0);
+  const zeroSales     = recsZero.reduce((a,r)=>a+r.sales,0);
+
+  function detailRow(r, seq){
+    const i = records.indexOf(r);
+    if (editMode){
+      return `<tr class="${r.flag?"flagged":""}" data-i="${i}">
+        <td class="c">${seq+1}</td>
+        <td class="c"><span class="ecell" contenteditable="true" data-i="${i}" data-f="date">${r.date}</span></td>
+        ${isEtc?`<td class="c"><span class="ecell" contenteditable="true" data-i="${i}" data-f="dtype">${r.dtype||""}</span></td>`:""}
+        <td class="wide"><span class="ecell" contenteditable="true" data-i="${i}" data-f="client">${r.client}</span></td>
+        <td class="wide"><span class="ecell" contenteditable="true" data-i="${i}" data-f="dest">${r.dest}</span></td>
+        <td class="num-cell"><span class="ecell num" contenteditable="true" data-i="${i}" data-f="fee">${fmt(r.fee)}</span></td>
+        <td class="c">${comboCell(i,"type",r.type,"typeList","w-typ","운임구분")}${r.flag?`<button class="mini-btn ok" data-act="clearflag" data-i="${i}" title="확인 완료(⚠ 해제)">⚠→✓</button>`:""}</td>
+        <td class="c"><span class="ecell" contenteditable="true" data-i="${i}" data-f="branch">${r.branch}</span></td>
+        <td class="c">${comboCell(i,"staff",r.staff,"staffList","w-per","비용담당")}</td>
+        <td class="c"><span class="ecell" contenteditable="true" data-i="${i}" data-f="driver">${r.driver}</span></td>
+        <td class="c">${comboCell(i,"vehicle",r.vehicle,"vehicleList","w-veh","차종")}</td>
+        <td class="num-cell"><span class="ecell num" contenteditable="true" data-i="${i}" data-f="sales">${fmt(r.sales)}</span></td>
+        <td class="c">${comboCell(i,"salesRep",r.salesRep,"repList","w-per","영업담당")}</td>
+        <td class="c edit-only"><button class="mini-btn del" data-act="del" data-i="${i}" title="행 삭제">✕</button></td>
+      </tr>`;
+    }
+    return `<tr class="${r.flag?"flagged":""}">
+      <td class="c">${seq+1}</td>
+      <td class="c">${r.date.slice(5)}</td>
+      ${isEtc?`<td class="c"><span class="dtype-chip">${r.dtype||"-"}</span></td>`:""}
+      <td class="wide">${r.client}</td>
+      <td class="wide">${r.dest}</td>
+      <td class="num-cell${r.fee?"":" zero"}"><b>${fmt(r.fee)}</b></td>
+      <td class="c">${r.type}${r.flag?" ⚠":""}</td>
+      <td class="c">${r.branch}</td>
+      <td class="c">${r.staff}</td>
+      <td class="c">${r.driver||"-"}</td>
+      <td class="c">${r.vehicle||"-"}</td>
+      <td class="num-cell${r.sales?"":" zero"}">${fmt(r.sales)}</td>
+      <td class="c">${r.salesRep}</td>
+    </tr>`;
+  }
+
+  let rows2="";
+  recsFee.forEach((r,seq)=>{ rows2 += detailRow(r, seq); });
+  if (!recsFee.length){
+    rows2=`<tr><td colspan="${cols}" style="text-align:center;color:var(--muted);padding:22px 0">
+      운반비가 발생한 내역이 없습니다.${editMode?' 아래 <b>＋ 행 추가</b> 버튼으로 입력할 수 있습니다.':''}</td></tr>`;
+  }
+  // 운반비 0원 상세표 (별도)
+  let zeroTable = "";
+  if (recsZero.length){
+    let zrows = "";
+    recsZero.forEach((r,seq)=>{ zrows += detailRow(r, seq); });
+    zeroTable = `
+    <h2 style="margin-top:22px"><span class="num">§</span> 운반비 0원 내역 <span style="font-weight:600;font-size:12px;color:var(--muted)">(추가상차·동반배송 등 운반비 미청구 · ${recsZero.length}건)</span></h2>
+    <div class="detail-wrap">
+    <table class="detail">
+      <thead><tr>
+        <th>순번</th><th>날짜</th>${isEtc?'<th>배송유형</th>':''}<th>업체명</th><th>도착지역</th><th>운반비</th>
+        <th>운임구분</th><th>매출<br>사업장</th><th>비용담당</th><th>기사명</th><th>차종</th><th>매출액</th><th>영업담당</th>${editMode?'<th class="edit-only">삭제</th>':''}
+      </tr></thead>
+      <tbody>
+        ${zrows}
+        <tr class="total">
+          <td colspan="${4+(isEtc?1:0)}" style="text-align:center">0원 합&nbsp;&nbsp;계&nbsp;&nbsp;(${recsZero.length}건)</td>
+          <td class="num-cell zero">0</td>
+          <td colspan="5" style="text-align:center;color:var(--muted)">운반비 없음</td>
+          <td class="num-cell"><b>${fmt(zeroSales)}</b></td><td></td>${editMode?'<td class="edit-only"></td>':''}
+        </tr>
+      </tbody>
+    </table>
+    </div>`;
+  }
+  const flagNote = total.flagCnt
+    ? `<div class="flag-note">⚠ 표시 ${total.flagCnt}건: 원데이터에서 당사/대불 구분이 명확하지 않아 <b>당사</b>로 처리했습니다. ${editMode?"운임구분을 수정하거나 ⚠→✓ 버튼으로 확인 처리하세요.":"'상세내역 편집' 버튼으로 수정할 수 있습니다."}</div>`
+    : "";
+  const editBar = editMode
+    ? `<div class="editbar">${(currentTab==="dm"||currentTab==="etc")?'<button class="mini-btn add" data-act="add">＋ 행 추가</button>':''}<span class="edit-hint">셀을 클릭해 수정하세요. 수정 즉시 카드·합계가 자동 재계산됩니다.${(currentTab==="all"||currentTab==="flt")?" 행 추가는 동명물류/기타 배송 탭에서 해주세요.":" 운임구분·비용담당·차종·영업담당은 목록 선택과 직접 입력이 모두 가능합니다."}</span></div>`
+    : "";
+
+  const sec2 = `
+  <div class="sec-detail">
+  <h2><span class="num">§</span> ${G.label} 상세 내역 ${editMode?'<span class="edit-badge">편집 중</span>':''}
+    <button class="mini-btn edit-toggle ${editMode?"editing":""}" data-act="toggleEdit" style="margin-left:auto">${editMode?"편집 완료":"상세내역 편집"}</button></h2>
+  ${editBar}
+  <div class="detail-wrap">
+  <table class="detail">
+    <thead><tr>
+      <th>순번</th><th>날짜</th>${isEtc?'<th>배송유형</th>':''}<th>업체명</th><th>도착지역</th><th>운반비</th>
+      <th>운임구분</th><th>매출<br>사업장</th><th>비용담당</th><th>기사명</th><th>차종</th><th>매출액</th><th>영업담당</th>${editMode?'<th class="edit-only">삭제</th>':''}
+    </tr></thead>
+    <tbody>
+      ${rows2}
+      <tr class="total">
+        <td colspan="${4+(isEtc?1:0)}" style="text-align:center">운반 합&nbsp;&nbsp;계&nbsp;&nbsp;(${recsFee.length}건)</td>
+        <td class="num-cell"><b>${fmt(feeTotalFee)}</b></td>
+        <td colspan="5" style="text-align:center">부가세 포함&nbsp;&nbsp;<b>${fmt(Math.round(feeTotalFee*1.1))}</b></td>
+        <td class="num-cell"><b>${fmt(feeTotalSales)}</b></td><td></td>${editMode?'<td class="edit-only"></td>':''}
+      </tr>
+      ${((currentTab==="etc"||currentTab==="all") && nfCnt) ? `
+      <tr class="subtotal">
+        <td colspan="${4+(isEtc?1:0)}" style="text-align:center">비운임 매출 (방문수령·반입 등 · ${nfCnt}건)</td>
+        <td class="num-cell zero">-</td>
+        <td colspan="5" style="text-align:center;color:var(--muted)">운반비 없음</td>
+        <td class="num-cell"><b>${fmt(nfSales)}</b></td><td></td>${editMode?'<td class="edit-only"></td>':''}
+      </tr>
+      <tr class="total">
+        <td colspan="${4+(isEtc?1:0)}" style="text-align:center">전체 전표 매출&nbsp;&nbsp;(${total.cnt+nfCnt}건)</td>
+        <td class="num-cell"><b>${fmt(total.fee)}</b></td>
+        <td colspan="5" style="text-align:center">부가세 포함&nbsp;&nbsp;<b>${fmt(Math.round(total.fee*1.1))}</b></td>
+        <td class="num-cell"><b>${fmt(total.sales+nfSales)}</b></td><td></td>${editMode?'<td class="edit-only"></td>':''}
+      </tr>` : ``}
+    </tbody>
+  </table>
+  </div>
+  ${zeroTable}
+  ${flagNote}
+  </div>`;
+
+  const confirm = `
+  <div class="confirm">
+    <span>위 <b style="color:var(--blue)">${total.cnt}</b>건 내용과 금액이 일치함을 확인합니다.</span>
+    <span class="sign">확인일자: ________________ &nbsp;&nbsp; 확 인 자: <b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b> (인)</span>
+  </div>`;
+
+  /* 필터 탭: 배송유형 필터 */
+  let dtypeBar = "";
+  if (currentTab==="flt"){
+    const opts = {};
+    records.filter(inPeriod).forEach(r=>{ if(r.dtype) opts[r.dtype]=(opts[r.dtype]||0)+1; });
+    const keys = Object.keys(opts).sort((a,b)=>opts[b]-opts[a]);
+    dtypeBar = `<span class="dtbar">배송유형 필터:
+      <select class="dtype-filter">
+        <option value="">전체 (${keys.reduce((a,k)=>a+opts[k],0)}건)</option>
+        ${keys.map(k=>`<option value="${k.replace(/"/g,'&quot;')}" ${k===dtypeFilter?"selected":""}>${k} (${opts[k]}건)</option>`).join("")}
+      </select></span>`;
+    if (dtypeFilter && !keys.includes(dtypeFilter)) dtypeFilter = "";   // 기간 변경으로 사라진 필터 해제
+  }
+  const filterTag = (currentTab==="flt" && dtypeFilter) ? ` <span class="filter-chip">${dtypeFilter}</span>` : "";
+
+  document.getElementById("report").innerHTML = `
+    <h1>${G.title}${filterTag} <span style="color:#c6ccd4">—</span> <span class="datepart">${dateLabel}</span></h1>
+    <div class="meta">
+      <span>기간: <b>${dateLabel}</b></span>
+      <span>대상: <b>${currentTab==="flt" && dtypeFilter ? dtypeFilter : G.target}</b></span>
+      ${dtypeBar ? `<span>${dtypeBar}</span>` : ""}
+      <span>출력일: <b>${new Date().toISOString().slice(0,10).replace(/-/g,".")}</b></span>
+      <span>작성자: <b>관리자</b></span>
+      <span>대상 <b>${total.cnt}건</b></span>
+    </div>
+    ${cards}${sec1}${sec1b}${sec2}${confirm}`
+    .replace(/<span class="num">§<\/span>/g, (()=>{ let n=0; return ()=>`<span class="num">${++n}</span>`; })());
+}
+
+/* ═══════ 엑셀 다운로드: 탭별 2개 시트 ═══════ */
+function sheetFor(group){
+  let recs = records.filter(r=>r.group===group && inPeriod(r));
+  if (group==="flt") recs = records.filter(r=>inPeriod(r) && (!dtypeFilter || r.dtype===dtypeFilter));
+  const isEtc = group!=="dm";
+  const total = recs.reduce((a,r)=>a+r.fee,0);
+  const sales = recs.reduce((a,r)=>a+r.sales,0);
+  const head = ["순번","날짜"].concat(isEtc?["배송유형"]:[]).concat(
+    ["업체명","도착지역","운반비","운임구분","매  출\n사업장","비용담당","기사명","차종","매출액","영업\n담당자명"]);
+  const data = [
+    [GROUPS[group].title + (group==="flt" && dtypeFilter ? " — " + dtypeFilter : "")],
+    ["기  간:", periodTag(), "", "", total, recs.length],
+    head
+  ];
+  recs.forEach((r,seq)=>{
+    const row=[seq+1, r.date].concat(isEtc?[r.dtype]:[]).concat(
+      [r.client, r.dest, r.fee, r.type+(r.flag?" (확인필요)":""), r.branch, r.staff, r.driver, r.vehicle, r.sales, r.salesRep]);
+    data.push(row);
+  });
+  data.push([]);
+  data.push(["","","","합계", total, "부가세포함", Math.round(total*1.1), "", "매출합계", sales]);
+  if (group==="etc"){
+    const nfR = nonFreight.filter(inPeriod);
+    const nfS = nfR.reduce((a,r)=>a+r.sales,0);
+    data.push(["","","","비운임 매출(방문수령·반입 등)", "", `(${nfR.length}건)`, "", "", "매출", nfS]);
+  }
+  data.push(["위", recs.length, "내용과 금액이 일치함을 확인합니다."]);
+  data.push(["확인일자","","","확 인 자:",""]);
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const w = [{wch:6},{wch:11}].concat(isEtc?[{wch:18}]:[]).concat(
+    [{wch:32},{wch:30},{wch:10},{wch:12},{wch:9},{wch:12},{wch:8},{wch:10},{wch:11},{wch:12}]);
+  ws["!cols"]=w;
+  return ws;
+}
+function downloadXlsx(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheetFor("dm"), "동명물류");
+  XLSX.utils.book_append_sheet(wb, sheetFor("etc"), "기타배송");
+  if (dtypeFilter){
+    const nm = ("필터_" + dtypeFilter.replace(/[\\/?*\[\]:]/g,"")).slice(0,31);
+    XLSX.utils.book_append_sheet(wb, sheetFor("flt"), nm);
+  }
+  XLSX.writeFile(wb, `배송유형별_운반비_${periodTag().replace(/-/g,"_")}.xlsx`);
+}
+
+/* ═══════ 업로드 ═══════ */
+document.getElementById("fileInput").addEventListener("change", e=>{
+  const f=e.target.files[0]; const st=document.getElementById("status");
+  if(!f) return;
+  st.className="status"; st.textContent="파일을 읽는 중...";
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:"array"});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:""});
+      if(!rows.length) throw new Error("데이터 행이 없습니다.");
+      if(!("배송유형" in rows[0])) throw new Error("'배송유형' 열을 찾을 수 없습니다. 매입매출종합검색 형식인지 확인해주세요.");
+      const {records:recs, nonFreight:nf, dateMin, dateMax}=convertRaw(rows);
+      if(!recs.length) throw new Error(`배송 대상 건을 찾지 못했습니다. (전체 ${rows.length}행)`);
+      records=recs; nonFreight=nf; dtypeFilter="";
+      // 엑셀의 날짜 범위에 맞춰 기간 모드 자동 설정
+      let modeMsg = "";
+      if (dateMin && dateMax){
+        if (dateMin === dateMax){
+          periodMode="day"; dateA=dateMin; dateB=dateMin;
+          modeMsg = `일간(${dateMin})`;
+        } else {
+          periodMode="range"; dateA=dateMin; dateB=dateMax;
+          modeMsg = `기간(${dateMin} ~ ${dateMax})`;
+        }
+      }
+      syncPeriodUI();
+      render();
+      const dmN=recs.filter(r=>r.group==="dm").length, etN=recs.length-dmN;
+      const fl=recs.filter(r=>r.flag).length;
+      st.textContent=`변환 완료: 전체 ${rows.length}행 → 동명물류 ${dmN}건 · 기타 배송 ${etN}건`+(modeMsg?` · ${modeMsg} 자동설정`:"")+(fl?` · 확인필요 ${fl}건(⚠)`:"");
+    }catch(err){ st.className="status err"; st.textContent="오류: "+err.message; }
+  };
+  reader.readAsArrayBuffer(f);
+});
+
+document.getElementById("btnReset").addEventListener("click", ()=>{
+  if (records.length && !confirm("입력한 내용을 모두 지우고 빈 양식으로 돌아갈까요?")) return;
+  records=[]; nonFreight=[]; dtypeFilter="";
+  dateA=isoOf(new Date()); dateB=dateA; periodMode="day";
+  syncPeriodUI();
+  document.getElementById("fileInput").value="";
+  editMode=true;
+  const st=document.getElementById("status");
+  st.className="status"; st.textContent="빈 양식으로 초기화했습니다.";
+  render();
+});
+document.getElementById("btnDownload").addEventListener("click", downloadXlsx);
+
+/* ═══════ 탭 전환 ═══════ */
+document.getElementById("tabs").addEventListener("click", e=>{
+  const t=e.target.closest(".tab");
+  if(t && t.dataset.tab!==currentTab){ currentTab=t.dataset.tab; render(); }
+});
+
+/* ═══════ 편집 ═══════ */
+function toggleEdit(){ editMode=!editMode; render(); }
+function saveCell(el){
+  const i=+el.dataset.i, f=el.dataset.f;
+  if(!records[i]) return;
+  const raw=el.textContent.trim();
+  let changed=false;
+  if(f==="fee"||f==="sales"){
+    const v=toNum(raw);
+    if(records[i][f]!==v){ records[i][f]=v; changed=true; }
+  } else {
+    if(records[i][f]!==raw){ records[i][f]=raw; changed=true; }
+  }
+  if(changed) render();
+  else if(f==="fee"||f==="sales") el.textContent=fmt(records[i][f]);
+}
+function saveInput(el){
+  const i=+el.dataset.i, f=el.dataset.f;
+  if(!records[i]) return;
+  const v=el.value.trim();
+  if(records[i][f]!==v){
+    records[i][f]=v;
+    if(f==="type") records[i].flag=false;
+    render();
+  }
+}
+const reportEl=document.getElementById("report");
+reportEl.addEventListener("focusout", e=>{
+  if(!editMode) return;
+  const el=e.target;
+  if(el.classList&&el.classList.contains("ecell")) saveCell(el);
+  if(el.classList&&el.classList.contains("einp")) saveInput(el);
+});
+reportEl.addEventListener("keydown", e=>{
+  if(editMode&&e.target.classList&&e.target.classList.contains("ecell")&&e.key==="Enter"){
+    e.preventDefault(); e.target.blur();
+  }
+});
+reportEl.addEventListener("change", e=>{
+  if(e.target.classList&&e.target.classList.contains("dtype-filter")){
+    dtypeFilter = e.target.value; render(); return;
+  }
+  if(!editMode) return;
+  if(e.target.classList&&e.target.classList.contains("einp")) saveInput(e.target);
+});
+reportEl.addEventListener("click", e=>{
+  const btn=e.target.closest("[data-act]");
+  if(!btn) return;
+  const act=btn.dataset.act;
+  if(act==="toggleEdit"){ toggleEdit(); return; }
+  if(!editMode) return;
+  if(act==="del"){
+    const i=+btn.dataset.i;
+    if(confirm(`선택한 행(${(records[i].client||"(업체명 없음)").slice(0,20)})을 삭제할까요?`)){
+      records.splice(i,1); renumberAll(records); render();
+    }
+  } else if(act==="clearflag"){
+    records[+btn.dataset.i].flag=false; render();
+  } else if(act==="add"){
+    records.push({no:0,date:periodRange()[0],client:"",dest:"",fee:0,type:currentTab==="etc"?"착불":"당사",
+      branch:"",staff:"",driver:"",vehicle:"",sales:0,salesRep:"",
+      dtype:currentTab==="etc"?"":"★(신용)동명물류(김동규)",group:currentTab,flag:false});
+    renumberAll(records); render();
+    const trs=reportEl.querySelectorAll(".detail tbody tr");
+    if(trs.length>1) trs[trs.length-2].scrollIntoView({block:"center"});
+  }
+});
+
+/* ═══════ 콤보박스 목록 주입 ═══════ */
+function fillList(id, arr){
+  document.getElementById(id).innerHTML = arr.map(v=>`<option value="${v}">`).join("");
+}
+fillList("vehicleList", VOCAB.vehicles);
+fillList("typeList",    VOCAB.types);
+fillList("staffList",   VOCAB.staff);
+fillList("repList",     VOCAB.reps);
+
+const elMode=document.getElementById("periodMode");
+const elA=document.getElementById("dateA");
+const elB=document.getElementById("dateB");
+const elSep=document.getElementById("rangeSep");
+const elWeek=document.getElementById("weekInfo");
+const elPrev=document.getElementById("navPrev");
+const elNext=document.getElementById("navNext");
+function shiftPeriod(dir){
+  const d = new Date(dateA+"T00:00:00");
+  if (periodMode==="day")       d.setDate(d.getDate()+dir);
+  else if (periodMode==="week") d.setDate(d.getDate()+dir*7);
+  else if (periodMode==="month"){ d.setDate(1); d.setMonth(d.getMonth()+dir); }
+  else return;                                        // 기간 모드에서는 이동 없음
+  dateA = isoOf(d); dateB = dateA;
+  syncPeriodUI(); render();
+}
+elPrev.addEventListener("click", ()=>shiftPeriod(-1));
+elNext.addEventListener("click", ()=>shiftPeriod(1));
+function syncPeriodUI(){
+  elMode.value=periodMode;
+  elA.value=dateA; elB.value=dateB;
+  elB.style.display = elSep.style.display = (periodMode==="range")?"":"none";
+  elPrev.style.display = elNext.style.display = (periodMode==="range")?"none":"";
+  if (periodMode==="week" || periodMode==="month"){
+    const [s,e]=periodRange();
+    elWeek.textContent=`${s.slice(5).replace("-","/")} ~ ${e.slice(5).replace("-","/")}`;
+    elWeek.style.display="";
+  } else elWeek.style.display="none";
+}
+elMode.addEventListener("change", ()=>{
+  periodMode=elMode.value;
+  if (periodMode==="day"){ dateA=isoOf(new Date()); dateB=dateA; }   // 일간 → 오늘로 초기화
+  syncPeriodUI(); render();
+});
+elA.addEventListener("change", ()=>{ if(elA.value){ dateA=elA.value; if(periodMode!=="range") dateB=dateA; syncPeriodUI(); render(); } });
+elB.addEventListener("change", ()=>{ if(elB.value){ dateB=elB.value; syncPeriodUI(); render(); } });
+syncPeriodUI();
+
+
+/* ═══════ 인쇄 범위 선택 ═══════ */
+let prevTitle = document.title;
+function printReport(brief){
+  // 카카오톡·네이버·인스타 등 앱 내 브라우저는 인쇄 미지원
+  if (/KAKAOTALK|NAVER\(inapp|Instagram|Line\/|FBAN|FBAV|everytimeApp|DaumApps/i.test(navigator.userAgent)){
+    alert("앱 내 브라우저에서는 인쇄/PDF 저장이 지원되지 않습니다.\n화면의 메뉴(⋮ 또는 공유 버튼)에서 'Chrome으로 열기' 또는 '다른 브라우저로 열기'를 선택한 뒤 다시 시도해 주세요.");
+    return;
+  }
+  document.body.classList.toggle("print-brief", !!brief);
+  const rows = document.querySelectorAll(".sec2 tbody tr").length;
+  document.body.classList.toggle("print-dense", rows > 50);
+  prevTitle = document.title;
+  const fTag = (currentTab==="flt" && dtypeFilter) ? "_" + dtypeFilter.replace(/[^\w가-힣]/g,"") : "";
+  document.title = "운반비_" + periodTag() + fTag;      // PDF 저장 파일명
+  try { window.print(); }
+  catch(e){
+    document.title = prevTitle;
+    alert("이 브라우저에서는 인쇄 기능을 사용할 수 없습니다. Chrome, Edge, Safari 등에서 열어주세요.");
+  }
+}
+window.addEventListener("afterprint", ()=>{
+  document.body.classList.remove("print-brief");
+  document.body.classList.remove("print-dense");
+  document.title = prevTitle;
+});
+document.getElementById("btnPrintBrief").addEventListener("click", ()=>printReport(true));
+document.getElementById("btnPrintFull").addEventListener("click", ()=>printReport(false));
+
+document.getElementById("printDate").textContent =
+  new Date().toLocaleString("ko-KR",{year:"2-digit",month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"});
+document.getElementById("status").textContent =
+  "매입매출종합검색 엑셀을 올리면 자동 변환됩니다. 관리자는 편집 후 '이 기간 저장'으로 선택 기간 전체를 날짜별로 구글시트에 보관할 수 있습니다.";
+
+/* ═══════════ 로그인 ═══════════ */
+const loginOverlay = document.getElementById("loginOverlay");
+const loginBtn = document.getElementById("loginBtn");
+const loginMsg = document.getElementById("loginMsg");
+
+function applyRole(){
+  document.body.classList.toggle("role-staff", SESSION.role==="staff");
+  document.body.classList.toggle("role-admin", SESSION.role==="admin");
+  const bar = document.getElementById("userBar");
+  const rc = SESSION.role==="admin"
+    ? '<span class="role-chip role-admin">관리자</span>'
+    : '<span class="role-chip role-staff">조회</span>';
+  bar.innerHTML = `${SESSION.id||""} ${rc} <a id="logoutLink">로그아웃</a>`;
+  const lo = document.getElementById("logoutLink");
+  if (lo) lo.addEventListener("click", logout);
+  const staff = SESSION.role!=="admin";
+  document.getElementById("btnCloudSave").disabled = staff;
+  document.getElementById("fileInput").disabled = staff;
+  document.getElementById("btnReset").disabled = staff;
+  if (staff && editMode) editMode=false;
+}
+
+async function doLoginFlow(){
+  const id = document.getElementById("loginId").value.trim();
+  const pw = document.getElementById("loginPw").value;
+  if (!id || !pw){ loginMsg.textContent="아이디와 비밀번호를 입력하세요."; return; }
+  loginMsg.textContent = "확인 중...";
+  loginBtn.disabled = true;
+  try {
+    if (!API_URL){
+      SESSION = { id:id+" (오프라인)", role:"admin", token:null };
+    } else {
+      const r = await apiCall({ action:"login", id, pw });
+      SESSION = { id:r.id, role:r.role, token:r.token };
+      try { sessionStorage.setItem("freightSession", JSON.stringify(SESSION)); } catch(_){}
+    }
+    loginMsg.textContent = "";
+    loginOverlay.style.display = "none";
+    applyRole();
+    render();
+  } catch(err){
+    loginMsg.textContent = err.message;
+  } finally {
+    loginBtn.disabled = false;
+  }
+}
+function logout(){
+  SESSION = { id:null, role:null, token:null };
+  try { sessionStorage.removeItem("freightSession"); } catch(_){}
+  document.getElementById("loginId").value="";
+  document.getElementById("loginPw").value="";
+  loginOverlay.style.display = "flex";
+}
+loginBtn.addEventListener("click", doLoginFlow);
+document.getElementById("loginPw").addEventListener("keydown", e=>{ if(e.key==="Enter") doLoginFlow(); });
+document.getElementById("loginId").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("loginPw").focus(); });
+
+try {
+  const saved = sessionStorage.getItem("freightSession");
+  if (saved){ SESSION = JSON.parse(saved); loginOverlay.style.display="none"; applyRole(); }
+} catch(_){}
+
+/* ═══════════ 구글시트 저장/불러오기 ═══════════ */
+const cloudStatus = document.getElementById("cloudStatus");
+function setCloud(msg, cls){ cloudStatus.textContent=msg; cloudStatus.className="status"+(cls?(" "+cls):""); }
+
+document.getElementById("btnCloudSave").addEventListener("click", async ()=>{
+  if (SESSION.role!=="admin"){ setCloud("관리자만 저장할 수 있습니다.","err"); return; }
+  const [s,e] = periodRange();
+  // 선택 기간 안에서 실제 데이터가 있는 날짜만 수집
+  const dset = new Set();
+  records.forEach(r=>{ if(r.date && r.date>=s && r.date<=e) dset.add(r.date); });
+  nonFreight.forEach(r=>{ if(r.date && r.date>=s && r.date<=e) dset.add(r.date); });
+  const days = [...dset].sort();
+  if (!days.length){ setCloud(`${s===e?s:s+"~"+e} 에 저장할 데이터가 없습니다.`,"err"); return; }
+  let ok=0, fail=0, lastStamp="";
+  for (let idx=0; idx<days.length; idx++){
+    const d = days[idx];
+    setCloud(`저장 중... (${idx+1}/${days.length}) ${d}`);
+    const dayRecs = records.filter(r=>r.date===d);
+    const dayNf   = nonFreight.filter(r=>r.date===d);
+    try {
+      const r = await apiCall({ action:"save", token:SESSION.token, date:d, records:dayRecs, nonFreight:dayNf });
+      ok++; lastStamp = r.updatedAt||"";
+    } catch(err){ fail++; }
+  }
+  const totalCnt = records.filter(r=>r.date>=s && r.date<=e).length;
+  if (fail) setCloud(`저장 완료 ${ok}일 · 실패 ${fail}일 (${days[0]}~${days[days.length-1]})`, fail? "err":"ok");
+  else setCloud(`저장 완료: ${days.length}일치 (${days[0]}${days.length>1?"~"+days[days.length-1]:""}) · 총 ${totalCnt}건 · ${lastStamp}`,"ok");
+});
+
+document.getElementById("btnCloudLoad").addEventListener("click", async ()=>{
+  setCloud("불러오는 중...");
+  try {
+    const [s,e] = periodRange();
+    const dd = await apiCall({ action:"dates" });
+    const targets = (dd.dates||[]).map(x=>x.date).filter(dt=>dt>=s && dt<=e);
+    if (!targets.length){ setCloud(`구글시트에 ${s}~${e} 데이터가 없습니다.`,"err"); return; }
+    records = records.filter(r=>!(r.date>=s && r.date<=e));
+    nonFreight = nonFreight.filter(r=>!(r.date>=s && r.date<=e));
+    for (const dt of targets){
+      const one = await apiCall({ action:"load", date:dt });
+      records = records.concat(one.records||[]);
+      nonFreight = nonFreight.concat(one.nonFreight||[]);
+    }
+    renumberAll(records);
+    render();
+    setCloud(`불러오기 완료: ${targets.length}일치 (${records.filter(r=>r.date>=s&&r.date<=e).length}건)`,"ok");
+  } catch(err){ setCloud("불러오기 실패: "+err.message,"err"); }
+});
+
+render();
+</script>
+</body>
+</html>
